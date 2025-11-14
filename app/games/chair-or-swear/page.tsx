@@ -12,6 +12,7 @@ export default function ChairOrSwear() {
   const [gameState, setGameState] = useState<GameState>("idle");
   const [currentWord, setCurrentWord] = useState<GameWord | null>(null);
   const [feedback, setFeedback] = useState("");
+  const [wordKey, setWordKey] = useState(0); // Key to trigger animation
 
   // Load high score from localStorage on mount
   useEffect(() => {
@@ -32,6 +33,7 @@ export default function ChairOrSwear() {
     const word = getRandomWord();
     setCurrentWord(word);
     setGameState("playing");
+    setWordKey(prev => prev + 1); // Increment key to trigger animation
   };
 
   const handleAnswer = (guess: "chair" | "swear") => {
@@ -141,7 +143,7 @@ export default function ChairOrSwear() {
           ) : gameState === "gameOver" ? (
             <>
               {/* Game Over Screen */}
-              <div className="w-full max-w-2xl p-12 border-2 border-gray-200 dark:border-gray-800 rounded-lg text-center">
+              <div className="w-full max-w-2xl p-12 border-2 border-gray-200 dark:border-gray-800 rounded-lg text-center animate-fade-in">
                 <p className="text-4xl font-bold text-black dark:text-white mb-4">
                   Game Over!
                 </p>
@@ -149,7 +151,7 @@ export default function ChairOrSwear() {
                   Final Score: {score}
                 </p>
                 {score === highScore && score > 0 && (
-                  <p className="text-lg text-blue-600 dark:text-blue-400 mb-6">
+                  <p className="text-lg text-blue-600 dark:text-blue-400 mb-6 animate-bounce">
                     🎉 New High Score! 🎉
                   </p>
                 )}
@@ -165,13 +167,16 @@ export default function ChairOrSwear() {
             <>
               {/* Word Display */}
               <div className="w-full max-w-2xl p-12 border-2 border-gray-200 dark:border-gray-800 rounded-lg text-center">
-                <p className="text-5xl font-bold text-black dark:text-white mb-8">
+                <p 
+                  key={wordKey}
+                  className="text-5xl font-bold text-black dark:text-white mb-8 animate-word-appear"
+                >
                   {currentWord?.word || "..."}
                 </p>
                 
                 {/* Feedback */}
                 {feedback && (
-                  <p className={`text-xl font-semibold ${
+                  <p className={`text-xl font-semibold animate-fade-in ${
                     gameState === "correct" 
                       ? "text-green-600 dark:text-green-400" 
                       : "text-red-600 dark:text-red-400"
