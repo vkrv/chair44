@@ -1,0 +1,196 @@
+# Chair44 Game Website - Cursor Rules
+
+## Project Overview
+Chair44 is a collection of browser-based games with a minimalist design inspired by neal.fun.
+
+## Tech Stack
+- Next.js 16 (App Router)
+- React 19
+- TypeScript
+- Tailwind CSS 4
+
+## Code Style & Conventions
+
+### TypeScript
+- Use TypeScript for all new files
+- Define interfaces for all data structures
+- Prefer `interface` over `type` for object shapes
+- Use explicit return types for functions when not obvious
+- Avoid `any` types - use `unknown` if type is truly unknown
+
+### React Components
+- Use functional components with hooks
+- Prefer named exports for pages, default exports are fine for page.tsx files
+- Use Server Components by default (Next.js App Router)
+- Only add 'use client' when necessary (state, effects, browser APIs)
+- Keep components focused and single-purpose
+
+### Naming Conventions
+- Components: PascalCase (e.g., `GameCard.tsx`)
+- Files: kebab-case for utilities (e.g., `game-utils.ts`)
+- Variables/functions: camelCase (e.g., `handleClick`, `gameData`)
+- Constants: UPPER_SNAKE_CASE (e.g., `MAX_SCORE`)
+- CSS classes: Use Tailwind utility classes
+
+### File Structure
+```
+app/
+  ├── page.tsx              # Home page with game grid
+  ├── layout.tsx            # Root layout
+  ├── globals.css           # Global styles
+  └── games/
+      └── [id]/
+          └── page.tsx      # Individual game pages
+components/
+  ├── ui/                   # Reusable UI components
+  └── games/                # Game-specific components
+lib/
+  └── utils.ts              # Utility functions
+```
+
+## Design System
+
+### Colors
+- Background: White (#ffffff) / Dark Black (#0a0a0a)
+- Text Primary: Black (#000000) / White (#ededed)
+- Text Secondary: Gray-600 / Gray-400
+- Borders: Gray-200 / Gray-800
+- Accent: Blue-600 / Blue-400 (for hovers and active states)
+
+### Typography
+- Font Family: Geist Sans (primary), Geist Mono (code)
+- Headings: Bold, use semantic sizing (text-4xl, text-2xl, etc.)
+- Body: Regular weight, text-base or text-lg
+- Line height: leading-relaxed for body text
+
+### Spacing
+- Use Tailwind's spacing scale (4, 6, 8, 12, etc.)
+- Consistent padding: p-6 or p-8 for cards
+- Consistent gaps: gap-4 for grids
+
+### Components
+- Cards: Border, rounded-lg, padding-8
+- Hover states: Always include subtle transitions
+- Focus states: Ensure keyboard navigation is clear
+- Responsive: Mobile-first approach (md: for desktop)
+
+## UI Patterns
+
+### Game Cards
+- Display emoji icon (text-4xl)
+- Title (text-2xl, font-semibold)
+- Description (text-gray-600)
+- Hover effects: border color change, shadow-lg, emoji scale-110
+- Link to /games/[id]
+
+### Layout
+- Max width: max-w-6xl
+- Horizontal padding: px-6
+- Vertical padding: py-8 or py-12
+
+### Dark Mode
+- Always include dark mode variants
+- Use dark: prefix for Tailwind classes
+- Test both light and dark modes
+
+## Best Practices
+
+### Performance
+- Use Next.js Image component for images
+- Lazy load heavy components
+- Minimize client-side JavaScript
+- Use Server Components when possible
+
+### Accessibility
+- Use semantic HTML elements
+- Include alt text for images
+- Ensure keyboard navigation works
+- Maintain good color contrast ratios
+
+### Code Organization
+- Keep files under 300 lines when possible
+- Extract reusable logic into hooks or utilities
+- Co-locate related components
+- Group imports: React/Next, third-party, local
+
+### Git Commits
+- Use clear, descriptive commit messages
+- Format: "verb: description" (e.g., "feat: add snake game")
+- Keep commits focused and atomic
+
+## Game Development Guidelines
+
+### New Game Checklist
+1. Add game entry to games array in app/page.tsx
+2. Create game page at app/games/[id]/page.tsx
+3. Include back button to home
+4. Add game instructions
+5. Implement responsive design
+6. Test on mobile and desktop
+7. Ensure dark mode compatibility
+
+### Game Page Structure
+- Header with game title and back button
+- Game canvas/container
+- Instructions section
+- Score display (if applicable)
+- Restart/reset button
+
+### State Management
+- Use useState for simple local state
+- Use useReducer for complex game state
+- Consider context for shared state across components
+- Keep game logic separate from UI components
+
+## Testing & Quality
+
+### Before Committing
+- Check for TypeScript errors
+- Run linter (npm run lint)
+- Test in both light and dark modes
+- Test on mobile viewport
+- Verify all links work
+
+### Code Review Focus
+- Type safety
+- Accessibility
+- Performance implications
+- Code readability
+- Consistency with style guide
+
+## Common Patterns to Follow
+
+### Link Component Usage
+```tsx
+import Link from "next/link";
+
+<Link href="/path" className="...">
+  Content
+</Link>
+```
+
+### Conditional Dark Mode Classes
+```tsx
+className="bg-white dark:bg-black text-black dark:text-white"
+```
+
+### Game Data Interface
+```tsx
+interface Game {
+  id: string;
+  title: string;
+  description: string;
+  emoji: string;
+}
+```
+
+## What to Avoid
+- Inline styles (use Tailwind classes)
+- Magic numbers (define constants)
+- Deep component nesting (flatten when possible)
+- Overly complex components (split into smaller ones)
+- Hardcoded values (use constants or config)
+- Missing TypeScript types
+- Ignoring dark mode
+- Non-semantic HTML (use proper elements)
+
