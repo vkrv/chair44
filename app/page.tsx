@@ -10,6 +10,13 @@ interface Game {
 
 const games: Game[] = [
   {
+    id: "chair-or-swear",
+    title: "Chair or Swear",
+    description: "Can you tell the difference between a chair and a swear word?",
+    emoji: "🪑",
+    available: true
+  },
+  {
     id: "snake",
     title: "Snake Game",
     description: "Classic snake game. Eat food, grow longer, don't hit yourself!",
