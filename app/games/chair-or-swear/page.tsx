@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useState, useEffect } from "react";
 import { getRandomWord, checkAnswer, type GameWord } from "@/lib/chair-or-swear-data";
+import { playSuccessSound, playErrorSound } from "@/lib/sound-effects";
 
 type GameState = "idle" | "playing" | "correct" | "wrong" | "gameOver";
 
@@ -46,6 +47,9 @@ export default function ChairOrSwear() {
       setScore(newScore);
       setGameState("correct");
       setFeedback("Correct! 🎉");
+      
+      // Play success sound
+      playSuccessSound();
 
       // Update high score if needed
       if (newScore > highScore) {
@@ -61,6 +65,9 @@ export default function ChairOrSwear() {
       setGameState("wrong");
       const correctAnswer = currentWord.type === "chair" ? "IKEA chair" : "Swedish swear";
       setFeedback(`Wrong! "${currentWord.word}" is a ${correctAnswer}.`);
+      
+      // Play error sound
+      playErrorSound();
 
       // Show game over after a delay
       setTimeout(() => {
