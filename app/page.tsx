@@ -12,7 +12,7 @@ const games: Game[] = [
   {
     id: "chair-or-swear",
     title: "Chair or Swear",
-    description: "Can you tell the difference between a chair and a swear word?",
+    description: "Can you tell the difference between an IKEA chair and a Swedish swear word?",
     emoji: "🪑",
     available: true
   },

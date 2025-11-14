@@ -1,15 +1,70 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { getRandomWord, checkAnswer, type GameWord } from "@/lib/chair-or-swear-data";
+
+type GameState = "idle" | "playing" | "correct" | "wrong" | "gameOver";
 
 export default function ChairOrSwear() {
   const [score, setScore] = useState(0);
-  const [gameStarted, setGameStarted] = useState(false);
+  const [highScore, setHighScore] = useState(0);
+  const [gameState, setGameState] = useState<GameState>("idle");
+  const [currentWord, setCurrentWord] = useState<GameWord | null>(null);
+  const [feedback, setFeedback] = useState("");
+
+  // Load high score from localStorage on mount
+  useEffect(() => {
+    const savedHighScore = localStorage.getItem("chairOrSwearHighScore");
+    if (savedHighScore) {
+      setHighScore(parseInt(savedHighScore, 10));
+    }
+  }, []);
 
   const handleStartGame = () => {
-    setGameStarted(true);
+    setGameState("playing");
     setScore(0);
+    setFeedback("");
+    loadNextWord();
+  };
+
+  const loadNextWord = () => {
+    const word = getRandomWord();
+    setCurrentWord(word);
+    setGameState("playing");
+  };
+
+  const handleAnswer = (guess: "chair" | "swear") => {
+    if (!currentWord || gameState !== "playing") return;
+
+    const isCorrect = checkAnswer(currentWord.word, guess);
+
+    if (isCorrect) {
+      const newScore = score + 1;
+      setScore(newScore);
+      setGameState("correct");
+      setFeedback("Correct! 🎉");
+
+      // Update high score if needed
+      if (newScore > highScore) {
+        setHighScore(newScore);
+        localStorage.setItem("chairOrSwearHighScore", newScore.toString());
+      }
+
+      // Load next word after a short delay
+      setTimeout(() => {
+        loadNextWord();
+      }, 800);
+    } else {
+      setGameState("wrong");
+      const correctAnswer = currentWord.type === "chair" ? "IKEA chair" : "Swedish swear";
+      setFeedback(`Wrong! "${currentWord.word}" is a ${correctAnswer}.`);
+
+      // Show game over after a delay
+      setTimeout(() => {
+        setGameState("gameOver");
+      }, 2000);
+    }
   };
 
   return (
@@ -53,7 +108,7 @@ export default function ChairOrSwear() {
             How to Play
           </h2>
           <p className="text-gray-600 dark:text-gray-400 leading-relaxed mb-2">
-            You'll be shown a word. Decide if it's a type of chair or a swear word!
+            You'll be shown a Swedish word. Decide if it's an IKEA chair name or a Swedish swear word!
           </p>
           <p className="text-gray-600 dark:text-gray-400 leading-relaxed">
             Click the correct category to score points. Wrong answers end the game.
@@ -61,41 +116,86 @@ export default function ChairOrSwear() {
         </div>
 
         {/* Score Display */}
-        {gameStarted && (
-          <div className="text-center mb-8">
-            <p className="text-lg text-gray-600 dark:text-gray-400 mb-2">Score</p>
-            <p className="text-6xl font-bold text-black dark:text-white">{score}</p>
+        {gameState !== "idle" && (
+          <div className="flex justify-center gap-12 mb-8">
+            <div className="text-center">
+              <p className="text-lg text-gray-600 dark:text-gray-400 mb-2">Score</p>
+              <p className="text-6xl font-bold text-black dark:text-white">{score}</p>
+            </div>
+            <div className="text-center">
+              <p className="text-lg text-gray-600 dark:text-gray-400 mb-2">High Score</p>
+              <p className="text-6xl font-bold text-blue-600 dark:text-blue-400">{highScore}</p>
+            </div>
           </div>
         )}
 
         {/* Game Content */}
         <div className="flex flex-col items-center gap-6">
-          {!gameStarted ? (
+          {gameState === "idle" ? (
             <button
               onClick={handleStartGame}
               className="px-8 py-4 text-lg font-semibold bg-black dark:bg-white text-white dark:text-black rounded-lg hover:opacity-80 transition-opacity"
             >
               Start Game
             </button>
+          ) : gameState === "gameOver" ? (
+            <>
+              {/* Game Over Screen */}
+              <div className="w-full max-w-2xl p-12 border-2 border-gray-200 dark:border-gray-800 rounded-lg text-center">
+                <p className="text-4xl font-bold text-black dark:text-white mb-4">
+                  Game Over!
+                </p>
+                <p className="text-2xl text-gray-600 dark:text-gray-400 mb-2">
+                  Final Score: {score}
+                </p>
+                {score === highScore && score > 0 && (
+                  <p className="text-lg text-blue-600 dark:text-blue-400 mb-6">
+                    🎉 New High Score! 🎉
+                  </p>
+                )}
+                <button
+                  onClick={handleStartGame}
+                  className="mt-4 px-8 py-4 text-lg font-semibold bg-black dark:bg-white text-white dark:text-black rounded-lg hover:opacity-80 transition-opacity"
+                >
+                  Play Again
+                </button>
+              </div>
+            </>
           ) : (
             <>
-              {/* Word Display - Placeholder */}
+              {/* Word Display */}
               <div className="w-full max-w-2xl p-12 border-2 border-gray-200 dark:border-gray-800 rounded-lg text-center">
                 <p className="text-5xl font-bold text-black dark:text-white mb-8">
-                  WORD
+                  {currentWord?.word || "..."}
                 </p>
-                <p className="text-gray-400 dark:text-gray-600 italic">
-                  (Game logic to be implemented)
-                </p>
+                
+                {/* Feedback */}
+                {feedback && (
+                  <p className={`text-xl font-semibold ${
+                    gameState === "correct" 
+                      ? "text-green-600 dark:text-green-400" 
+                      : "text-red-600 dark:text-red-400"
+                  }`}>
+                    {feedback}
+                  </p>
+                )}
               </div>
 
-              {/* Answer Buttons - Placeholder */}
+              {/* Answer Buttons */}
               <div className="flex gap-4">
-                <button className="px-8 py-4 text-lg font-semibold border-2 border-black dark:border-white text-black dark:text-white rounded-lg hover:bg-black hover:text-white dark:hover:bg-white dark:hover:text-black transition-colors">
-                  🪑 Chair
+                <button
+                  onClick={() => handleAnswer("chair")}
+                  disabled={gameState !== "playing"}
+                  className="px-8 py-4 text-lg font-semibold border-2 border-black dark:border-white text-black dark:text-white rounded-lg hover:bg-black hover:text-white dark:hover:bg-white dark:hover:text-black transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  🪑 IKEA Chair
                 </button>
-                <button className="px-8 py-4 text-lg font-semibold border-2 border-black dark:border-white text-black dark:text-white rounded-lg hover:bg-black hover:text-white dark:hover:bg-white dark:hover:text-black transition-colors">
-                  💢 Swear
+                <button
+                  onClick={() => handleAnswer("swear")}
+                  disabled={gameState !== "playing"}
+                  className="px-8 py-4 text-lg font-semibold border-2 border-black dark:border-white text-black dark:text-white rounded-lg hover:bg-black hover:text-white dark:hover:bg-white dark:hover:text-black transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  💢 Swedish Swear
                 </button>
               </div>
 
@@ -116,9 +216,9 @@ export default function ChairOrSwear() {
             About This Game
           </h3>
           <p className="text-gray-600 dark:text-gray-400 leading-relaxed">
-            This is a fun word recognition game that challenges your ability to distinguish
-            between furniture terminology and profanity. Perfect for expanding your
-            vocabulary in both categories!
+            This is a fun Swedish word recognition game! Can you tell the difference between
+            IKEA furniture names and Swedish profanity? It's harder than you think! Perfect for
+            Scandiphiles, IKEA enthusiasts, or anyone who wants to test their Swedish vocabulary.
           </p>
         </div>
       </main>
