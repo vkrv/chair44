@@ -18,6 +18,7 @@ export default function DrawPerfectSquare() {
   const [drawnPath, setDrawnPath] = useState<Point[]>([]);
   const [perfectSquare, setPerfectSquare] = useState<Point[]>([]);
   const [score, setScore] = useState<number | null>(null);
+  const [realtimeScore, setRealtimeScore] = useState<number>(0);
   const [attempts, setAttempts] = useState(0);
   const [highScore, setHighScore] = useState(0);
 
@@ -54,6 +55,64 @@ export default function DrawPerfectSquare() {
     };
   };
 
+  // Get vibrant color based on accuracy (0 = bad/red, 100 = good/green)
+  const getAccuracyColor = (accuracy: number): string => {
+    // Clamp between 0 and 100
+    const clamped = Math.max(0, Math.min(100, accuracy));
+    
+    // Red → Orange → Yellow → Green gradient
+    if (clamped < 33) {
+      // Red to Orange (0-33%)
+      const t = clamped / 33;
+      const r = 255;
+      const g = Math.round(69 + (165 - 69) * t); // 69 to 234
+      const b = 0;
+      return `rgb(${r}, ${g}, ${b})`;
+    } else if (clamped < 66) {
+      // Orange to Yellow (33-66%)
+      const t = (clamped - 33) / 33;
+      const r = Math.round(255 - (255 - 234) * t); // 255 to 234
+      const g = Math.round(165 + (179 - 165) * t); // 165 to 179
+      const b = 0;
+      return `rgb(${r}, ${g}, ${b})`;
+    } else {
+      // Yellow to Green (66-100%)
+      const t = (clamped - 66) / 34;
+      const r = Math.round(234 - 234 * t); // 234 to 0
+      const g = Math.round(179 + (220 - 179) * t); // 179 to 220
+      const b = Math.round(0 + (60) * t); // 0 to 60
+      return `rgb(${r}, ${g}, ${b})`;
+    }
+  };
+
+  // Get color based on overall score for text
+  const getScoreColor = (scoreValue: number): string => {
+    if (scoreValue >= 95) return "#22c55e"; // green-500
+    if (scoreValue >= 85) return "#3b82f6"; // blue-500
+    if (scoreValue >= 70) return "#eab308"; // yellow-500
+    if (scoreValue >= 50) return "#f97316"; // orange-500
+    return "#ef4444"; // red-500
+  };
+
+  const getScoreColorDark = (scoreValue: number): string => {
+    if (scoreValue >= 95) return "#4ade80"; // green-400
+    if (scoreValue >= 85) return "#60a5fa"; // blue-400
+    if (scoreValue >= 70) return "#facc15"; // yellow-400
+    if (scoreValue >= 50) return "#fb923c"; // orange-400
+    return "#f87171"; // red-400
+  };
+
+  // Calculate real-time score while drawing
+  useEffect(() => {
+    if (isDrawing && drawnPath.length > 20) {
+      const perfect = calculatePerfectSquare(drawnPath);
+      const currentScore = calculateSquarePerfection(drawnPath, perfect);
+      setRealtimeScore(currentScore);
+    } else if (!isDrawing && score === null) {
+      setRealtimeScore(0);
+    }
+  }, [drawnPath, isDrawing, score]);
+
   // Draw on canvas
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -83,20 +142,56 @@ export default function DrawPerfectSquare() {
       ctx.stroke();
     }
 
-    // Draw user's path
+    // Draw user's path with per-segment color based on accuracy
     if (drawnPath.length > 1) {
-      ctx.strokeStyle = isDark ? "#ffffff" : "#000000";
-      ctx.lineWidth = 4;
-      ctx.lineJoin = "round";
+      ctx.lineWidth = 5;
       ctx.lineCap = "round";
-      ctx.beginPath();
-      ctx.moveTo(drawnPath[0].x, drawnPath[0].y);
-      for (let i = 1; i < drawnPath.length; i++) {
-        ctx.lineTo(drawnPath[i].x, drawnPath[i].y);
+      ctx.lineJoin = "round";
+
+      // Calculate perfect square for current path
+      const currentPerfect = drawnPath.length > 20 ? calculatePerfectSquare(drawnPath) : perfectSquare;
+      
+      if (currentPerfect.length === 4) {
+        // Calculate max possible deviation (for normalization)
+        const bbox = getBoundingBox(drawnPath);
+        const maxDimension = Math.max(bbox.width, bbox.height);
+        const maxDeviation = maxDimension * 0.2; // 20% of max dimension
+        
+        // Draw each segment with its own color
+        for (let i = 1; i < drawnPath.length; i++) {
+          const point = drawnPath[i];
+          
+          // Find minimum distance to any edge of perfect square
+          let minDist = Infinity;
+          for (let j = 0; j < 4; j++) {
+            const p1 = currentPerfect[j];
+            const p2 = currentPerfect[(j + 1) % 4];
+            const dist = distanceToLineSegment(point, p1, p2);
+            minDist = Math.min(minDist, dist);
+          }
+          
+          // Convert distance to accuracy percentage (closer = higher %)
+          const accuracy = Math.max(0, 100 - (minDist / maxDeviation) * 100);
+          const color = getAccuracyColor(accuracy);
+          
+          ctx.strokeStyle = color;
+          ctx.beginPath();
+          ctx.moveTo(drawnPath[i - 1].x, drawnPath[i - 1].y);
+          ctx.lineTo(point.x, point.y);
+          ctx.stroke();
+        }
+      } else {
+        // Fallback: draw in gray if no perfect square yet
+        ctx.strokeStyle = isDark ? "#666666" : "#999999";
+        ctx.beginPath();
+        ctx.moveTo(drawnPath[0].x, drawnPath[0].y);
+        for (let i = 1; i < drawnPath.length; i++) {
+          ctx.lineTo(drawnPath[i].x, drawnPath[i].y);
+        }
+        ctx.stroke();
       }
-      ctx.stroke();
     }
-  }, [isDrawing, drawnPath, perfectSquare, score]);
+  }, [isDrawing, drawnPath, perfectSquare, score, realtimeScore]);
 
   const calculateDistance = (p1: Point, p2: Point): number => {
     return Math.sqrt(Math.pow(p2.x - p1.x, 2) + Math.pow(p2.y - p1.y, 2));
@@ -204,6 +299,7 @@ export default function DrawPerfectSquare() {
     setDrawnPath([point]);
     setScore(null);
     setPerfectSquare([]);
+    setRealtimeScore(0);
   };
 
   const handleMove = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
@@ -293,6 +389,7 @@ export default function DrawPerfectSquare() {
               score >= 95 ? "text-green-600 dark:text-green-400" :
               score >= 85 ? "text-blue-600 dark:text-blue-400" :
               score >= 70 ? "text-yellow-600 dark:text-yellow-400" :
+              score >= 50 ? "text-orange-600 dark:text-orange-400" :
               "text-red-600 dark:text-red-400"
             }`}>
               {score}%
@@ -306,6 +403,21 @@ export default function DrawPerfectSquare() {
                "😅 Keep Trying!"}
             </p>
           </div>
+        ) : isDrawing && realtimeScore > 0 ? (
+          <div className="text-center mb-6">
+            <p className={`text-7xl font-bold mb-2 transition-colors duration-200 ${
+              realtimeScore >= 95 ? "text-green-600 dark:text-green-400" :
+              realtimeScore >= 85 ? "text-blue-600 dark:text-blue-400" :
+              realtimeScore >= 70 ? "text-yellow-600 dark:text-yellow-400" :
+              realtimeScore >= 50 ? "text-orange-600 dark:text-orange-400" :
+              "text-red-600 dark:text-red-400"
+            }`}>
+              {realtimeScore.toFixed(1)}%
+            </p>
+            <p className="text-lg text-gray-400 dark:text-gray-600">
+              Keep going...
+            </p>
+          </div>
         ) : (
           <div className="text-center mb-6">
             <p className="text-2xl text-gray-400 dark:text-gray-600 mb-2">
@@ -313,7 +425,7 @@ export default function DrawPerfectSquare() {
             </p>
             {attempts > 0 && (
               <p className="text-sm text-gray-500 dark:text-gray-500">
-                Best: {highScore}%
+                Best: {highScore.toFixed(1)}%
               </p>
             )}
           </div>
