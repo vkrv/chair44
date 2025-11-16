@@ -105,9 +105,10 @@ export default function DrawPerfectSquare() {
     return "#f87171"; // red-400
   };
 
-  // Lock the perfect square after enough points are drawn
+  // Lock the perfect square after enough points are drawn (fresh calculation each attempt)
   useEffect(() => {
     if (isDrawing && !isSquareLocked && drawnPath.length === LOCK_THRESHOLD) {
+      // Calculate a brand new square based on this attempt
       const perfect = calculatePerfectSquare(drawnPath);
       setPerfectSquare(perfect);
       setIsSquareLocked(true);
@@ -340,11 +341,12 @@ export default function DrawPerfectSquare() {
     e.preventDefault();
     const point = getCanvasPoint(e);
 
+    // Reset everything for a fresh attempt
     setIsDrawing(true);
     setDrawnPath([point]);
     setScore(null);
-    setPerfectSquare([]);
-    setIsSquareLocked(false);
+    setPerfectSquare([]); // Clear old square
+    setIsSquareLocked(false); // Unlock for new calculation
     setRealtimeScore(0);
   };
 
@@ -392,11 +394,13 @@ export default function DrawPerfectSquare() {
   };
 
   const handleReset = () => {
+    // Complete reset - clear everything for next attempt
     setIsDrawing(false);
     setDrawnPath([]);
-    setPerfectSquare([]);
-    setIsSquareLocked(false);
+    setPerfectSquare([]); // Remove old target square
+    setIsSquareLocked(false); // Allow new square to be calculated
     setScore(null);
+    setRealtimeScore(0);
   };
 
   return (
