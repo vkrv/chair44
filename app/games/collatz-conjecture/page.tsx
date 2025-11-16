@@ -413,7 +413,7 @@ export default function CollatzConjecture() {
   const handleWheel = (e: React.WheelEvent<HTMLCanvasElement>) => {
     e.preventDefault();
     const delta = e.deltaY > 0 ? 0.9 : 1.1;
-    const newZoom = Math.max(0.5, Math.min(5, zoom * delta));
+    const newZoom = Math.max(0.5, Math.min(8, zoom * delta));
     
     // Zoom towards mouse position
     const canvas = graphCanvasRef.current;
@@ -457,6 +457,23 @@ export default function CollatzConjecture() {
     setPanY(0);
   };
 
+  // Reset all graphs
+  const resetAllGraphs = () => {
+    const confirm = window.confirm(
+      "This will clear all tested numbers from the cumulative graph. Continue?"
+    );
+    if (!confirm) return;
+
+    setGraphNodes(new Map());
+    setAllSequences(new Set([1]));
+    setSequence([]);
+    setNodes([]);
+    setScore(null);
+    setCurrentStep(0);
+    setIsAnimating(false);
+    resetView();
+  };
+
   // Draw cumulative graph
   useEffect(() => {
     const canvas = graphCanvasRef.current;
@@ -475,35 +492,52 @@ export default function CollatzConjecture() {
     // Save context and apply transformations
     ctx.save();
     ctx.translate(panX, panY);
-    ctx.scale(zoom, zoom);
 
-    // Draw all connections
+    // Calculate center point for scaling
+    const centerX = CANVAS_WIDTH / 2;
+    const centerY = CANVAS_HEIGHT / 2;
+
+    // Helper function to get scaled position
+    const getScaledPos = (x: number, y: number) => {
+      // Spread nodes out from center as we zoom in
+      const dx = x - centerX;
+      const dy = y - centerY;
+      return {
+        x: centerX + dx * zoom,
+        y: centerY + dy * zoom
+      };
+    };
+
+    // Draw all connections with visible width
     ctx.strokeStyle = isDark ? "#374151" : "#d1d5db";
-    ctx.lineWidth = 1.5;
+    ctx.lineWidth = Math.max(1.5, 1.5 * Math.sqrt(zoom * 0.5)); // Keep lines visible
     
     graphNodes.forEach((node) => {
       node.connections.forEach(targetValue => {
         const target = graphNodes.get(targetValue);
         if (target) {
+          const nodePos = getScaledPos(node.x, node.y);
+          const targetPos = getScaledPos(target.x, target.y);
+          
           // Draw edge
           ctx.beginPath();
-          ctx.moveTo(node.x, node.y);
-          ctx.lineTo(target.x, target.y);
+          ctx.moveTo(nodePos.x, nodePos.y);
+          ctx.lineTo(targetPos.x, targetPos.y);
           ctx.stroke();
           
-          // Draw small arrowhead
-          const angle = Math.atan2(target.y - node.y, target.x - node.x);
-          const arrowSize = 5;
+          // Draw arrowhead with visible size
+          const angle = Math.atan2(targetPos.y - nodePos.y, targetPos.x - nodePos.x);
+          const arrowSize = Math.max(5, 5 * Math.sqrt(zoom * 0.5)); // Keep arrows visible
           ctx.fillStyle = isDark ? "#374151" : "#d1d5db";
           ctx.beginPath();
-          ctx.moveTo(target.x, target.y);
+          ctx.moveTo(targetPos.x, targetPos.y);
           ctx.lineTo(
-            target.x - arrowSize * Math.cos(angle - Math.PI / 6),
-            target.y - arrowSize * Math.sin(angle - Math.PI / 6)
+            targetPos.x - arrowSize * Math.cos(angle - Math.PI / 6),
+            targetPos.y - arrowSize * Math.sin(angle - Math.PI / 6)
           );
           ctx.lineTo(
-            target.x - arrowSize * Math.cos(angle + Math.PI / 6),
-            target.y - arrowSize * Math.sin(angle + Math.PI / 6)
+            targetPos.x - arrowSize * Math.cos(angle + Math.PI / 6),
+            targetPos.y - arrowSize * Math.sin(angle + Math.PI / 6)
           );
           ctx.closePath();
           ctx.fill();
@@ -513,6 +547,8 @@ export default function CollatzConjecture() {
 
     // Draw nodes
     graphNodes.forEach((node) => {
+      const nodePos = getScaledPos(node.x, node.y);
+      
       // Node color
       let nodeColor;
       if (node.value === 1) {
@@ -523,19 +559,24 @@ export default function CollatzConjecture() {
         nodeColor = isDark ? "#3b82f6" : "#2563eb"; // Other: blue
       }
       
+      // Calculate node size - stays visible, gets slightly bigger when zoomed in
+      const baseSize = 6;
+      const nodeSize = Math.max(baseSize, baseSize * Math.sqrt(zoom));
+      
       // Draw node circle
       ctx.fillStyle = nodeColor;
       ctx.beginPath();
-      ctx.arc(node.x, node.y, 6, 0, Math.PI * 2);
+      ctx.arc(nodePos.x, nodePos.y, nodeSize, 0, Math.PI * 2);
       ctx.fill();
       
-      // Draw value label
+      // Draw value label with readable size
       if (showAllLabels || node.value === 1 || node.value < 20 || sequence.includes(node.value)) {
+        const fontSize = Math.max(10, 10 * Math.sqrt(zoom * 0.7));
         ctx.fillStyle = isDark ? "#ffffff" : "#000000";
-        ctx.font = "10px monospace";
+        ctx.font = `${fontSize}px monospace`;
         ctx.textAlign = "center";
         ctx.textBaseline = "bottom";
-        ctx.fillText(node.value.toString(), node.x, node.y - 10);
+        ctx.fillText(node.value.toString(), nodePos.x, nodePos.y - nodeSize - 4);
       }
     });
 
@@ -735,6 +776,12 @@ export default function CollatzConjecture() {
                   className="px-3 py-1 text-sm bg-gray-200 dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded hover:bg-gray-300 dark:hover:bg-gray-700 transition-colors"
                 >
                   Reset View
+                </button>
+                <button
+                  onClick={resetAllGraphs}
+                  className="px-3 py-1 text-sm bg-red-600 dark:bg-red-500 text-white rounded hover:bg-red-700 dark:hover:bg-red-600 transition-colors"
+                >
+                  Clear All
                 </button>
               </div>
             </div>
