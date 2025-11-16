@@ -468,9 +468,9 @@ export default function CollatzConjecture() {
     setAllSequences(new Set([1]));
     setSequence([]);
     setNodes([]);
-    setScore(null);
     setCurrentStep(0);
     setIsAnimating(false);
+    setStats({ steps: 0, maxValue: 0, stoppingTime: 0 });
     resetView();
   };
 
