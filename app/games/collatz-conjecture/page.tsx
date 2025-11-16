@@ -45,6 +45,7 @@ export default function CollatzConjecture() {
   const [panY, setPanY] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
+  const [showAllLabels, setShowAllLabels] = useState(false);
 
   // Calculate Collatz sequence
   const calculateSequence = (n: number): number[] => {
@@ -528,8 +529,8 @@ export default function CollatzConjecture() {
       ctx.arc(node.x, node.y, 6, 0, Math.PI * 2);
       ctx.fill();
       
-      // Draw value label for special nodes
-      if (node.value === 1 || node.value < 20 || sequence.includes(node.value)) {
+      // Draw value label
+      if (showAllLabels || node.value === 1 || node.value < 20 || sequence.includes(node.value)) {
         ctx.fillStyle = isDark ? "#ffffff" : "#000000";
         ctx.font = "10px monospace";
         ctx.textAlign = "center";
@@ -547,7 +548,7 @@ export default function CollatzConjecture() {
     ctx.textAlign = "right";
     ctx.textBaseline = "top";
     ctx.fillText(`Zoom: ${zoom.toFixed(1)}x`, CANVAS_WIDTH - 10, 10);
-  }, [graphNodes, sequence, zoom, panX, panY]);
+  }, [graphNodes, sequence, zoom, panX, panY, showAllLabels]);
 
   return (
     <div className="min-h-screen bg-white dark:bg-black">
@@ -718,12 +719,24 @@ export default function CollatzConjecture() {
               <h3 className="text-lg font-semibold text-black dark:text-white">
                 All Tested Numbers ({graphNodes.size} nodes)
               </h3>
-              <button
-                onClick={resetView}
-                className="px-3 py-1 text-sm bg-gray-200 dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded hover:bg-gray-300 dark:hover:bg-gray-700 transition-colors"
-              >
-                Reset View
-              </button>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setShowAllLabels(!showAllLabels)}
+                  className={`px-3 py-1 text-sm font-medium rounded transition-colors ${
+                    showAllLabels
+                      ? "bg-blue-600 dark:bg-blue-500 text-white hover:bg-blue-700 dark:hover:bg-blue-600"
+                      : "bg-gray-200 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-700"
+                  }`}
+                >
+                  {showAllLabels ? "Hide Labels" : "Show All Labels"}
+                </button>
+                <button
+                  onClick={resetView}
+                  className="px-3 py-1 text-sm bg-gray-200 dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded hover:bg-gray-300 dark:hover:bg-gray-700 transition-colors"
+                >
+                  Reset View
+                </button>
+              </div>
             </div>
             <div className="border-2 border-gray-200 dark:border-gray-800 rounded-lg overflow-hidden bg-white dark:bg-black">
               <canvas
