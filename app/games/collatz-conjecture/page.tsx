@@ -24,10 +24,13 @@ export default function CollatzConjecture() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const graphCanvasRef = useRef<HTMLCanvasElement>(null);
   const [startNumber, setStartNumber] = useState<string>("27");
+  const [rangeNumber, setRangeNumber] = useState<string>("100");
   const [sequence, setSequence] = useState<number[]>([]);
   const [nodes, setNodes] = useState<Node[]>([]);
   const [currentStep, setCurrentStep] = useState(0);
   const [isAnimating, setIsAnimating] = useState(false);
+  const [isCalculatingRange, setIsCalculatingRange] = useState(false);
+  const [calculationProgress, setCalculationProgress] = useState(0);
   const [allSequences, setAllSequences] = useState<Set<number>>(new Set([1]));
   const [graphNodes, setGraphNodes] = useState<Map<number, GraphNode>>(new Map());
   const [stats, setStats] = useState({
@@ -196,6 +199,75 @@ export default function CollatzConjecture() {
         node.y = y;
       });
     });
+  };
+
+  // Calculate all numbers up to a range
+  const handleCalculateRange = async () => {
+    const maxNum = parseInt(rangeNumber);
+    if (isNaN(maxNum) || maxNum < 1) {
+      alert("Please enter a positive integer");
+      return;
+    }
+    
+    if (maxNum > 1000) {
+      const confirm = window.confirm(
+        `This will calculate ${maxNum} sequences. For large numbers, this may take a while. Continue?`
+      );
+      if (!confirm) return;
+    }
+
+    setIsCalculatingRange(true);
+    setCalculationProgress(0);
+
+    // Process in batches to allow UI updates
+    const batchSize = 50;
+    const newGraphNodes = new Map(graphNodes);
+    
+    for (let i = 1; i <= maxNum; i++) {
+      const seq = calculateSequence(i);
+      
+      // Add connections to graph
+      for (let j = 0; j < seq.length - 1; j++) {
+        const current = seq[j];
+        const next = seq[j + 1];
+        
+        if (!newGraphNodes.has(current)) {
+          newGraphNodes.set(current, {
+            value: current,
+            x: 0,
+            y: 0,
+            connections: new Set()
+          });
+        }
+        
+        newGraphNodes.get(current)!.connections.add(next);
+      }
+
+      // Update progress
+      if (i % batchSize === 0 || i === maxNum) {
+        setCalculationProgress(Math.round((i / maxNum) * 100));
+        
+        // Allow UI to update
+        await new Promise(resolve => setTimeout(resolve, 0));
+      }
+    }
+
+    // Ensure endpoint exists
+    if (!newGraphNodes.has(1)) {
+      newGraphNodes.set(1, {
+        value: 1,
+        x: 0,
+        y: 0,
+        connections: new Set()
+      });
+    }
+
+    // Layout and update graph
+    layoutCumulativeGraph(newGraphNodes);
+    setGraphNodes(newGraphNodes);
+    
+    setIsCalculatingRange(false);
+    setCalculationProgress(0);
   };
 
   // Start visualization
@@ -529,36 +601,79 @@ export default function CollatzConjecture() {
         </div>
 
         {/* Controls */}
-        <div className="mb-6 flex gap-4 items-end">
-          <div className="flex-1 max-w-xs">
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-              Starting Number
-            </label>
-            <input
-              type="number"
-              value={startNumber}
-              onChange={(e) => setStartNumber(e.target.value)}
-              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-900 text-black dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-              placeholder="Enter a number"
-              min="1"
-              max="10000"
-            />
-          </div>
-          <button
-            onClick={handleVisualize}
-            disabled={isAnimating}
-            className="px-6 py-2 bg-blue-600 dark:bg-blue-500 text-white font-semibold rounded-lg hover:bg-blue-700 dark:hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-          >
-            Visualize
-          </button>
-          {isAnimating && (
+        <div className="mb-6 space-y-4">
+          {/* Single Number Visualization */}
+          <div className="flex gap-4 items-end">
+            <div className="flex-1 max-w-xs">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Single Number
+              </label>
+              <input
+                type="number"
+                value={startNumber}
+                onChange={(e) => setStartNumber(e.target.value)}
+                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-900 text-black dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                placeholder="Enter a number"
+                min="1"
+                max="10000"
+                disabled={isCalculatingRange}
+              />
+            </div>
             <button
-              onClick={() => setIsAnimating(false)}
-              className="px-6 py-2 bg-gray-600 dark:bg-gray-500 text-white font-semibold rounded-lg hover:bg-gray-700 dark:hover:bg-gray-600 transition-colors"
+              onClick={handleVisualize}
+              disabled={isAnimating || isCalculatingRange}
+              className="px-6 py-2 bg-blue-600 dark:bg-blue-500 text-white font-semibold rounded-lg hover:bg-blue-700 dark:hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
-              Stop
+              Visualize
             </button>
-          )}
+            {isAnimating && (
+              <button
+                onClick={() => setIsAnimating(false)}
+                className="px-6 py-2 bg-gray-600 dark:bg-gray-500 text-white font-semibold rounded-lg hover:bg-gray-700 dark:hover:bg-gray-600 transition-colors"
+              >
+                Stop
+              </button>
+            )}
+          </div>
+
+          {/* Range Calculation */}
+          <div className="flex gap-4 items-end p-4 bg-purple-50 dark:bg-purple-950 border border-purple-200 dark:border-purple-800 rounded-lg">
+            <div className="flex-1 max-w-xs">
+              <label className="block text-sm font-medium text-purple-900 dark:text-purple-100 mb-2">
+                Calculate All Numbers (1 to N)
+              </label>
+              <input
+                type="number"
+                value={rangeNumber}
+                onChange={(e) => setRangeNumber(e.target.value)}
+                className="w-full px-4 py-2 border border-purple-300 dark:border-purple-700 rounded-lg bg-white dark:bg-gray-900 text-black dark:text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
+                placeholder="Enter max number"
+                min="1"
+                max="5000"
+                disabled={isCalculatingRange || isAnimating}
+              />
+            </div>
+            <button
+              onClick={handleCalculateRange}
+              disabled={isCalculatingRange || isAnimating}
+              className="px-6 py-2 bg-purple-600 dark:bg-purple-500 text-white font-semibold rounded-lg hover:bg-purple-700 dark:hover:bg-purple-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            >
+              {isCalculatingRange ? `${calculationProgress}%` : "Calculate Range"}
+            </button>
+            {isCalculatingRange && (
+              <div className="flex-1 max-w-xs">
+                <div className="w-full bg-purple-200 dark:bg-purple-900 rounded-full h-2">
+                  <div
+                    className="bg-purple-600 dark:bg-purple-400 h-2 rounded-full transition-all duration-300"
+                    style={{ width: `${calculationProgress}%` }}
+                  />
+                </div>
+                <p className="text-xs text-purple-700 dark:text-purple-300 mt-1">
+                  Calculating sequences...
+                </p>
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Stats */}
