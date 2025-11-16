@@ -10,6 +10,13 @@ interface Game {
 
 const games: Game[] = [
   {
+    id: "draw-perfect-square",
+    title: "Draw a Perfect Square",
+    description: "Can you draw a perfect square? Test your spatial skills and precision!",
+    emoji: "⬜",
+    available: true
+  },
+  {
     id: "chair-or-swear",
     title: "Chair or Swear",
     description: "Can you tell the difference between an IKEA chair and a Swedish swear word?",

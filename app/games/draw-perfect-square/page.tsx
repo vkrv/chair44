@@ -1,0 +1,362 @@
+"use client";
+
+import Link from "next/link";
+import { useState, useRef, useEffect } from "react";
+import { playSuccessSound, playErrorSound } from "@/lib/sound-effects";
+
+interface Point {
+  x: number;
+  y: number;
+}
+
+const CANVAS_SIZE = 600;
+const CENTER = { x: CANVAS_SIZE / 2, y: CANVAS_SIZE / 2 };
+
+export default function DrawPerfectSquare() {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const [isDrawing, setIsDrawing] = useState(false);
+  const [drawnPath, setDrawnPath] = useState<Point[]>([]);
+  const [perfectSquare, setPerfectSquare] = useState<Point[]>([]);
+  const [score, setScore] = useState<number | null>(null);
+  const [attempts, setAttempts] = useState(0);
+  const [highScore, setHighScore] = useState(0);
+
+  // Load high score from localStorage
+  useEffect(() => {
+    const savedHighScore = localStorage.getItem("drawSquareHighScore");
+    if (savedHighScore) {
+      setHighScore(parseFloat(savedHighScore));
+    }
+  }, []);
+
+  const getBoundingBox = (path: Point[]): { minX: number; maxX: number; minY: number; maxY: number; width: number; height: number } => {
+    if (path.length === 0) return { minX: 0, maxX: 0, minY: 0, maxY: 0, width: 0, height: 0 };
+    
+    let minX = path[0].x;
+    let maxX = path[0].x;
+    let minY = path[0].y;
+    let maxY = path[0].y;
+    
+    for (const point of path) {
+      minX = Math.min(minX, point.x);
+      maxX = Math.max(maxX, point.x);
+      minY = Math.min(minY, point.y);
+      maxY = Math.max(maxY, point.y);
+    }
+    
+    return {
+      minX,
+      maxX,
+      minY,
+      maxY,
+      width: maxX - minX,
+      height: maxY - minY
+    };
+  };
+
+  // Draw on canvas
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+
+    const isDark = typeof window !== "undefined" && window.matchMedia("(prefers-color-scheme: dark)").matches;
+
+    // Clear canvas
+    ctx.clearRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
+
+    // Draw perfect square (blue overlay when complete)
+    if (perfectSquare.length === 4 && score !== null) {
+      ctx.fillStyle = isDark ? "rgba(96, 165, 250, 0.15)" : "rgba(37, 99, 235, 0.1)";
+      ctx.beginPath();
+      ctx.moveTo(perfectSquare[0].x, perfectSquare[0].y);
+      for (let i = 1; i < perfectSquare.length; i++) {
+        ctx.lineTo(perfectSquare[i].x, perfectSquare[i].y);
+      }
+      ctx.closePath();
+      ctx.fill();
+
+      ctx.strokeStyle = isDark ? "rgba(96, 165, 250, 0.8)" : "rgba(37, 99, 235, 0.8)";
+      ctx.lineWidth = 3;
+      ctx.stroke();
+    }
+
+    // Draw user's path
+    if (drawnPath.length > 1) {
+      ctx.strokeStyle = isDark ? "#ffffff" : "#000000";
+      ctx.lineWidth = 4;
+      ctx.lineJoin = "round";
+      ctx.lineCap = "round";
+      ctx.beginPath();
+      ctx.moveTo(drawnPath[0].x, drawnPath[0].y);
+      for (let i = 1; i < drawnPath.length; i++) {
+        ctx.lineTo(drawnPath[i].x, drawnPath[i].y);
+      }
+      ctx.stroke();
+    }
+  }, [isDrawing, drawnPath, perfectSquare, score]);
+
+  const calculateDistance = (p1: Point, p2: Point): number => {
+    return Math.sqrt(Math.pow(p2.x - p1.x, 2) + Math.pow(p2.y - p1.y, 2));
+  };
+
+  const calculatePerfectSquare = (path: Point[]): Point[] => {
+    const bbox = getBoundingBox(path);
+    const centerX = (bbox.minX + bbox.maxX) / 2;
+    const centerY = (bbox.minY + bbox.maxY) / 2;
+    
+    // Use the average of width and height for side length
+    const sideLength = (bbox.width + bbox.height) / 2;
+    const halfSide = sideLength / 2;
+    
+    // Create axis-aligned perfect square
+    return [
+      { x: centerX - halfSide, y: centerY - halfSide }, // Top-left
+      { x: centerX + halfSide, y: centerY - halfSide }, // Top-right
+      { x: centerX + halfSide, y: centerY + halfSide }, // Bottom-right
+      { x: centerX - halfSide, y: centerY + halfSide }, // Bottom-left
+    ];
+  };
+
+  const calculateSquarePerfection = (path: Point[], perfectSq: Point[]): number => {
+    if (path.length < 10) return 0;
+
+    const bbox = getBoundingBox(path);
+    
+    // Calculate aspect ratio (how close to 1:1)
+    const aspectRatio = Math.min(bbox.width, bbox.height) / Math.max(bbox.width, bbox.height);
+    const aspectScore = aspectRatio * 100;
+    
+    // Calculate how much the path deviates from the perfect square
+    const perfectSideLength = calculateDistance(perfectSq[0], perfectSq[1]);
+    let totalDeviation = 0;
+    
+    for (const point of path) {
+      // Find the minimum distance from this point to any edge of the perfect square
+      let minDist = Infinity;
+      
+      for (let i = 0; i < 4; i++) {
+        const p1 = perfectSq[i];
+        const p2 = perfectSq[(i + 1) % 4];
+        const dist = distanceToLineSegment(point, p1, p2);
+        minDist = Math.min(minDist, dist);
+      }
+      
+      totalDeviation += minDist;
+    }
+    
+    const avgDeviation = totalDeviation / path.length;
+    const deviationRatio = avgDeviation / perfectSideLength;
+    const pathScore = Math.max(0, 100 - (deviationRatio * 300));
+    
+    // Combine scores (aspect ratio is more important)
+    const finalScore = (aspectScore * 0.6) + (pathScore * 0.4);
+    
+    return Math.round(finalScore * 10) / 10;
+  };
+
+  const distanceToLineSegment = (point: Point, lineStart: Point, lineEnd: Point): number => {
+    const dx = lineEnd.x - lineStart.x;
+    const dy = lineEnd.y - lineStart.y;
+    const lengthSquared = dx * dx + dy * dy;
+    
+    if (lengthSquared === 0) return calculateDistance(point, lineStart);
+    
+    let t = ((point.x - lineStart.x) * dx + (point.y - lineStart.y) * dy) / lengthSquared;
+    t = Math.max(0, Math.min(1, t));
+    
+    const projectionX = lineStart.x + t * dx;
+    const projectionY = lineStart.y + t * dy;
+    
+    return calculateDistance(point, { x: projectionX, y: projectionY });
+  };
+
+
+  const getCanvasPoint = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>): Point => {
+    const canvas = canvasRef.current;
+    if (!canvas) return { x: 0, y: 0 };
+
+    const rect = canvas.getBoundingClientRect();
+    const scaleX = CANVAS_SIZE / rect.width;
+    const scaleY = CANVAS_SIZE / rect.height;
+
+    if ("touches" in e) {
+      const touch = e.touches[0];
+      return {
+        x: (touch.clientX - rect.left) * scaleX,
+        y: (touch.clientY - rect.top) * scaleY,
+      };
+    } else {
+      return {
+        x: (e.clientX - rect.left) * scaleX,
+        y: (e.clientY - rect.top) * scaleY,
+      };
+    }
+  };
+
+  const handleStart = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
+    e.preventDefault();
+    const point = getCanvasPoint(e);
+
+    setIsDrawing(true);
+    setDrawnPath([point]);
+    setScore(null);
+    setPerfectSquare([]);
+  };
+
+  const handleMove = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
+    e.preventDefault();
+    if (!isDrawing) return;
+
+    const point = getCanvasPoint(e);
+    setDrawnPath(prev => [...prev, point]);
+  };
+
+  const handleEnd = () => {
+    if (!isDrawing || drawnPath.length < 10) {
+      setIsDrawing(false);
+      setDrawnPath([]);
+      return;
+    }
+
+    setIsDrawing(false);
+    setAttempts(prev => prev + 1);
+
+    // Calculate perfect square based on drawn path
+    const perfect = calculatePerfectSquare(drawnPath);
+    setPerfectSquare(perfect);
+
+    // Calculate how close they were
+    const perfection = calculateSquarePerfection(drawnPath, perfect);
+    setScore(perfection);
+
+    // Update high score if needed
+    if (perfection > highScore) {
+      setHighScore(perfection);
+      localStorage.setItem("drawSquareHighScore", perfection.toString());
+      playSuccessSound();
+    } else if (perfection > 85) {
+      playSuccessSound();
+    } else if (perfection < 50) {
+      playErrorSound();
+    }
+  };
+
+  const handleReset = () => {
+    setIsDrawing(false);
+    setDrawnPath([]);
+    setPerfectSquare([]);
+    setScore(null);
+  };
+
+  return (
+    <div className="min-h-screen bg-white dark:bg-black">
+      {/* Header */}
+      <header className="border-b border-gray-200 dark:border-gray-800">
+        <div className="max-w-6xl mx-auto px-6 py-6">
+          <Link
+            href="/"
+            className="inline-flex items-center gap-2 text-gray-600 dark:text-gray-400 hover:text-black dark:hover:text-white transition-colors mb-4"
+          >
+            <svg
+              className="w-5 h-5"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M15 19l-7-7 7-7"
+              />
+            </svg>
+            Back to Home
+          </Link>
+          <div className="flex items-center gap-4">
+            <span className="text-4xl">⬜</span>
+            <h1 className="text-4xl font-bold text-black dark:text-white">
+              Draw a Perfect Square
+            </h1>
+          </div>
+        </div>
+      </header>
+
+      {/* Main Game Area */}
+      <main className="max-w-5xl mx-auto px-6 py-8">
+        {/* Score Display */}
+        {score !== null ? (
+          <div className="text-center mb-6 animate-fade-in">
+            <p className={`text-8xl font-bold mb-2 ${
+              score >= 95 ? "text-green-600 dark:text-green-400" :
+              score >= 85 ? "text-blue-600 dark:text-blue-400" :
+              score >= 70 ? "text-yellow-600 dark:text-yellow-400" :
+              "text-red-600 dark:text-red-400"
+            }`}>
+              {score}%
+            </p>
+            <p className="text-xl text-gray-600 dark:text-gray-400">
+              {score >= 99 ? "🎯 PERFECT!" :
+               score >= 95 ? "⭐ Nearly Perfect!" :
+               score >= 85 ? "👍 Excellent!" :
+               score >= 70 ? "👌 Good!" :
+               score >= 50 ? "🤔 Not Bad" :
+               "😅 Keep Trying!"}
+            </p>
+          </div>
+        ) : (
+          <div className="text-center mb-6">
+            <p className="text-2xl text-gray-400 dark:text-gray-600 mb-2">
+              Draw a perfect square
+            </p>
+            {attempts > 0 && (
+              <p className="text-sm text-gray-500 dark:text-gray-500">
+                Best: {highScore}%
+              </p>
+            )}
+          </div>
+        )}
+
+        {/* Canvas */}
+        <div className="flex justify-center">
+          <div className="relative">
+            <canvas
+              ref={canvasRef}
+              width={CANVAS_SIZE}
+              height={CANVAS_SIZE}
+              onMouseDown={handleStart}
+              onMouseMove={handleMove}
+              onMouseUp={handleEnd}
+              onMouseLeave={handleEnd}
+              onTouchStart={handleStart}
+              onTouchMove={handleMove}
+              onTouchEnd={handleEnd}
+              className="touch-none cursor-crosshair bg-white dark:bg-gray-950 rounded-lg shadow-lg"
+              style={{ width: "100%", maxWidth: "600px", height: "auto" }}
+            />
+            {score !== null && (
+              <button
+                onClick={handleReset}
+                className="absolute top-4 right-4 px-4 py-2 text-sm font-semibold bg-white/90 dark:bg-black/90 text-black dark:text-white rounded-lg hover:bg-white dark:hover:bg-black transition-colors shadow-lg"
+              >
+                Try Again
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Stats */}
+        {attempts > 0 && (
+          <div className="mt-8 text-center">
+            <p className="text-sm text-gray-500 dark:text-gray-500">
+              Attempts: {attempts} • Best: {highScore.toFixed(1)}%
+            </p>
+          </div>
+        )}
+      </main>
+    </div>
+  );
+}
+
