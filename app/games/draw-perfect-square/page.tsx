@@ -126,20 +126,60 @@ export default function DrawPerfectSquare() {
     // Clear canvas
     ctx.clearRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
 
-    // Draw perfect square (blue overlay when complete)
-    if (perfectSquare.length === 4 && score !== null) {
-      ctx.fillStyle = isDark ? "rgba(96, 165, 250, 0.15)" : "rgba(37, 99, 235, 0.1)";
+    // Draw center point
+    ctx.fillStyle = isDark ? "#888888" : "#666666";
+    ctx.beginPath();
+    ctx.arc(CENTER.x, CENTER.y, 6, 0, Math.PI * 2);
+    ctx.fill();
+    
+    // Draw center crosshair
+    ctx.strokeStyle = isDark ? "#666666" : "#999999";
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(CENTER.x - 15, CENTER.y);
+    ctx.lineTo(CENTER.x + 15, CENTER.y);
+    ctx.moveTo(CENTER.x, CENTER.y - 15);
+    ctx.lineTo(CENTER.x, CENTER.y + 15);
+    ctx.stroke();
+
+    // Draw perfect square guide (always visible when available)
+    if (perfectSquare.length === 4) {
+      // Draw as dashed line during drawing, solid when complete
+      if (score === null) {
+        ctx.setLineDash([5, 5]);
+        ctx.strokeStyle = isDark ? "rgba(96, 165, 250, 0.4)" : "rgba(37, 99, 235, 0.4)";
+        ctx.lineWidth = 2;
+      } else {
+        ctx.setLineDash([]);
+        ctx.fillStyle = isDark ? "rgba(96, 165, 250, 0.15)" : "rgba(37, 99, 235, 0.1)";
+        ctx.strokeStyle = isDark ? "rgba(96, 165, 250, 0.8)" : "rgba(37, 99, 235, 0.8)";
+        ctx.lineWidth = 3;
+      }
+      
       ctx.beginPath();
       ctx.moveTo(perfectSquare[0].x, perfectSquare[0].y);
       for (let i = 1; i < perfectSquare.length; i++) {
         ctx.lineTo(perfectSquare[i].x, perfectSquare[i].y);
       }
       ctx.closePath();
-      ctx.fill();
-
-      ctx.strokeStyle = isDark ? "rgba(96, 165, 250, 0.8)" : "rgba(37, 99, 235, 0.8)";
-      ctx.lineWidth = 3;
+      
+      if (score !== null) {
+        ctx.fill();
+      }
       ctx.stroke();
+      ctx.setLineDash([]);
+      
+      // Draw lines from center to corners when complete
+      if (score !== null) {
+        ctx.strokeStyle = isDark ? "rgba(96, 165, 250, 0.3)" : "rgba(37, 99, 235, 0.3)";
+        ctx.lineWidth = 1;
+        for (let i = 0; i < 4; i++) {
+          ctx.beginPath();
+          ctx.moveTo(CENTER.x, CENTER.y);
+          ctx.lineTo(perfectSquare[i].x, perfectSquare[i].y);
+          ctx.stroke();
+        }
+      }
     }
 
     // Draw user's path with per-segment color based on accuracy
@@ -198,20 +238,29 @@ export default function DrawPerfectSquare() {
   };
 
   const calculatePerfectSquare = (path: Point[]): Point[] => {
-    const bbox = getBoundingBox(path);
-    const centerX = (bbox.minX + bbox.maxX) / 2;
-    const centerY = (bbox.minY + bbox.maxY) / 2;
+    if (path.length < 2) return [];
     
-    // Use the average of width and height for side length
-    const sideLength = (bbox.width + bbox.height) / 2;
+    // Calculate average distance from center point
+    let totalDistance = 0;
+    for (const point of path) {
+      const dist = calculateDistance(point, CENTER);
+      totalDistance += dist;
+    }
+    const avgDistance = totalDistance / path.length;
+    
+    // Calculate side length from average distance
+    // For a square, distance from center to edge = sideLength / 2
+    // Distance from center to corner = sideLength * sqrt(2) / 2
+    // We use average, which is somewhere between these
+    const sideLength = avgDistance * 1.4; // Adjusted multiplier
     const halfSide = sideLength / 2;
     
-    // Create axis-aligned perfect square
+    // Create axis-aligned perfect square centered at CENTER
     return [
-      { x: centerX - halfSide, y: centerY - halfSide }, // Top-left
-      { x: centerX + halfSide, y: centerY - halfSide }, // Top-right
-      { x: centerX + halfSide, y: centerY + halfSide }, // Bottom-right
-      { x: centerX - halfSide, y: centerY + halfSide }, // Bottom-left
+      { x: CENTER.x - halfSide, y: CENTER.y - halfSide }, // Top-left
+      { x: CENTER.x + halfSide, y: CENTER.y - halfSide }, // Top-right
+      { x: CENTER.x + halfSide, y: CENTER.y + halfSide }, // Bottom-right
+      { x: CENTER.x - halfSide, y: CENTER.y + halfSide }, // Bottom-left
     ];
   };
 
@@ -314,13 +363,14 @@ export default function DrawPerfectSquare() {
     if (!isDrawing || drawnPath.length < 10) {
       setIsDrawing(false);
       setDrawnPath([]);
+      setPerfectSquare([]);
       return;
     }
 
     setIsDrawing(false);
     setAttempts(prev => prev + 1);
 
-    // Calculate perfect square based on drawn path
+    // Calculate perfect square based on drawn path (already set during drawing)
     const perfect = calculatePerfectSquare(drawnPath);
     setPerfectSquare(perfect);
 
