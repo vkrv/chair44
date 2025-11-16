@@ -17,10 +17,13 @@ export default function DrawPerfectSquare() {
   const [isDrawing, setIsDrawing] = useState(false);
   const [drawnPath, setDrawnPath] = useState<Point[]>([]);
   const [perfectSquare, setPerfectSquare] = useState<Point[]>([]);
+  const [isSquareLocked, setIsSquareLocked] = useState(false);
   const [score, setScore] = useState<number | null>(null);
   const [realtimeScore, setRealtimeScore] = useState<number>(0);
   const [attempts, setAttempts] = useState(0);
   const [highScore, setHighScore] = useState(0);
+
+  const LOCK_THRESHOLD = 25; // Number of points before locking the square
 
   // Load high score from localStorage
   useEffect(() => {
@@ -102,16 +105,24 @@ export default function DrawPerfectSquare() {
     return "#f87171"; // red-400
   };
 
-  // Calculate real-time score while drawing
+  // Lock the perfect square after enough points are drawn
   useEffect(() => {
-    if (isDrawing && drawnPath.length > 20) {
+    if (isDrawing && !isSquareLocked && drawnPath.length === LOCK_THRESHOLD) {
       const perfect = calculatePerfectSquare(drawnPath);
-      const currentScore = calculateSquarePerfection(drawnPath, perfect);
+      setPerfectSquare(perfect);
+      setIsSquareLocked(true);
+    }
+  }, [drawnPath, isDrawing, isSquareLocked]);
+
+  // Calculate real-time score while drawing (using locked square)
+  useEffect(() => {
+    if (isDrawing && isSquareLocked && perfectSquare.length === 4) {
+      const currentScore = calculateSquarePerfection(drawnPath, perfectSquare);
       setRealtimeScore(currentScore);
     } else if (!isDrawing && score === null) {
       setRealtimeScore(0);
     }
-  }, [drawnPath, isDrawing, score]);
+  }, [drawnPath, isDrawing, isSquareLocked, perfectSquare, score]);
 
   // Draw on canvas
   useEffect(() => {
@@ -142,19 +153,12 @@ export default function DrawPerfectSquare() {
     ctx.lineTo(CENTER.x, CENTER.y + 15);
     ctx.stroke();
 
-    // Draw perfect square guide (always visible when available)
-    if (perfectSquare.length === 4) {
-      // Draw as dashed line during drawing, solid when complete
-      if (score === null) {
-        ctx.setLineDash([5, 5]);
-        ctx.strokeStyle = isDark ? "rgba(96, 165, 250, 0.4)" : "rgba(37, 99, 235, 0.4)";
-        ctx.lineWidth = 2;
-      } else {
-        ctx.setLineDash([]);
-        ctx.fillStyle = isDark ? "rgba(96, 165, 250, 0.15)" : "rgba(37, 99, 235, 0.1)";
-        ctx.strokeStyle = isDark ? "rgba(96, 165, 250, 0.8)" : "rgba(37, 99, 235, 0.8)";
-        ctx.lineWidth = 3;
-      }
+    // Draw perfect square guide (only visible when complete)
+    if (perfectSquare.length === 4 && score !== null) {
+      // Draw filled square
+      ctx.fillStyle = isDark ? "rgba(96, 165, 250, 0.15)" : "rgba(37, 99, 235, 0.1)";
+      ctx.strokeStyle = isDark ? "rgba(96, 165, 250, 0.8)" : "rgba(37, 99, 235, 0.8)";
+      ctx.lineWidth = 3;
       
       ctx.beginPath();
       ctx.moveTo(perfectSquare[0].x, perfectSquare[0].y);
@@ -162,23 +166,17 @@ export default function DrawPerfectSquare() {
         ctx.lineTo(perfectSquare[i].x, perfectSquare[i].y);
       }
       ctx.closePath();
-      
-      if (score !== null) {
-        ctx.fill();
-      }
+      ctx.fill();
       ctx.stroke();
-      ctx.setLineDash([]);
       
-      // Draw lines from center to corners when complete
-      if (score !== null) {
-        ctx.strokeStyle = isDark ? "rgba(96, 165, 250, 0.3)" : "rgba(37, 99, 235, 0.3)";
-        ctx.lineWidth = 1;
-        for (let i = 0; i < 4; i++) {
-          ctx.beginPath();
-          ctx.moveTo(CENTER.x, CENTER.y);
-          ctx.lineTo(perfectSquare[i].x, perfectSquare[i].y);
-          ctx.stroke();
-        }
+      // Draw lines from center to corners
+      ctx.strokeStyle = isDark ? "rgba(96, 165, 250, 0.3)" : "rgba(37, 99, 235, 0.3)";
+      ctx.lineWidth = 1;
+      for (let i = 0; i < 4; i++) {
+        ctx.beginPath();
+        ctx.moveTo(CENTER.x, CENTER.y);
+        ctx.lineTo(perfectSquare[i].x, perfectSquare[i].y);
+        ctx.stroke();
       }
     }
 
@@ -188,10 +186,8 @@ export default function DrawPerfectSquare() {
       ctx.lineCap = "round";
       ctx.lineJoin = "round";
 
-      // Calculate perfect square for current path
-      const currentPerfect = drawnPath.length > 20 ? calculatePerfectSquare(drawnPath) : perfectSquare;
-      
-      if (currentPerfect.length === 4) {
+      // Use locked perfect square if available
+      if (perfectSquare.length === 4) {
         // Calculate max possible deviation (for normalization)
         const bbox = getBoundingBox(drawnPath);
         const maxDimension = Math.max(bbox.width, bbox.height);
@@ -204,8 +200,8 @@ export default function DrawPerfectSquare() {
           // Find minimum distance to any edge of perfect square
           let minDist = Infinity;
           for (let j = 0; j < 4; j++) {
-            const p1 = currentPerfect[j];
-            const p2 = currentPerfect[(j + 1) % 4];
+            const p1 = perfectSquare[j];
+            const p2 = perfectSquare[(j + 1) % 4];
             const dist = distanceToLineSegment(point, p1, p2);
             minDist = Math.min(minDist, dist);
           }
@@ -348,6 +344,7 @@ export default function DrawPerfectSquare() {
     setDrawnPath([point]);
     setScore(null);
     setPerfectSquare([]);
+    setIsSquareLocked(false);
     setRealtimeScore(0);
   };
 
@@ -364,15 +361,19 @@ export default function DrawPerfectSquare() {
       setIsDrawing(false);
       setDrawnPath([]);
       setPerfectSquare([]);
+      setIsSquareLocked(false);
       return;
     }
 
     setIsDrawing(false);
     setAttempts(prev => prev + 1);
 
-    // Calculate perfect square based on drawn path (already set during drawing)
-    const perfect = calculatePerfectSquare(drawnPath);
-    setPerfectSquare(perfect);
+    // Use the locked perfect square (or calculate if not locked yet)
+    let perfect = perfectSquare;
+    if (!isSquareLocked || perfectSquare.length === 0) {
+      perfect = calculatePerfectSquare(drawnPath);
+      setPerfectSquare(perfect);
+    }
 
     // Calculate how close they were
     const perfection = calculateSquarePerfection(drawnPath, perfect);
@@ -394,6 +395,7 @@ export default function DrawPerfectSquare() {
     setIsDrawing(false);
     setDrawnPath([]);
     setPerfectSquare([]);
+    setIsSquareLocked(false);
     setScore(null);
   };
 
