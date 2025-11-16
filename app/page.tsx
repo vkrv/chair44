@@ -10,6 +10,13 @@ interface Game {
 
 const games: Game[] = [
   {
+    id: "collatz-conjecture",
+    title: "Collatz Conjecture",
+    description: "Explore the mysterious 3n+1 problem with interactive graph visualization.",
+    emoji: "🔢",
+    available: true
+  },
+  {
     id: "draw-perfect-square",
     title: "Draw a Perfect Square",
     description: "Can you draw a perfect square? Test your spatial skills and precision!",
